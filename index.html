@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Login Page</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center h-screen">
+
+    <div id="app" class="w-full max-w-md mx-auto p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg text-center">
+        
+        <!-- Logged Out State -->
+        <div id="logged-out-view">
+            <h1 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Welcome</h1>
+            <p class="text-gray-600 dark:text-gray-400 mb-8">Please sign in with your authorized Google account.</p>
+            <button id="login-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-transform transform hover:scale-105">
+                <svg class="w-6 h-6 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.618-3.229-11.303-7.584l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C42.021,35.596,44,30.138,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+                Sign In with Google
+            </button>
+        </div>
+
+        <!-- Logged In State -->
+        <div id="logged-in-view" class="hidden">
+            <img id="user-photo" src="" alt="User Photo" class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-green-400">
+            <h1 class="text-2xl font-bold mb-1 text-gray-900 dark:text-white">Access Granted</h1>
+            <p class="text-gray-600 dark:text-gray-400 mb-1">Welcome, <span id="user-name" class="font-semibold"></span>!</p>
+            <p id="user-email" class="text-sm text-gray-500 dark:text-gray-400 mb-8"></p>
+            <button id="logout-button" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">
+                Sign Out
+            </button>
+        </div>
+
+        <!-- Access Denied State -->
+        <div id="access-denied-view" class="hidden">
+            <h1 class="text-3xl font-bold text-red-600 dark:text-red-500 mb-2">Access Denied</h1>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">Sorry, you are not authorized to access this website. This session will be terminated.</p>
+            <p id="denied-email" class="text-sm font-mono bg-gray-200 dark:bg-gray-700 p-2 rounded-md"></p>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        // IMPORTANT: Replace this with your actual Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCWciU_Ujqh1CCuIRB4vCe9-5mGjvh8RHs",
+            authDomain: "dwarka-dwarka.firebaseapp.com",
+            projectId: "dwarka-dwarka",
+            storageBucket: "dwarka-dwarka.appspot.com",
+            messagingSenderId: "251887059289",
+            appId: "1:251887059289:web:da1027cf96972ee0bf0c48",
+            measurementId: "G-Q00L119KS2"
+        };
+        
+        // =================================================================
+        // ==  VERY IMPORTANT: SET YOUR AUTHORIZED EMAIL ADDRESS BELOW    ==
+        // =================================================================
+        const ALLOWED_EMAIL = "2023.hardeep@gmail.com";
+        // =================================================================
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        // DOM Elements
+        const loggedOutView = document.getElementById('logged-out-view');
+        const loggedInView = document.getElementById('logged-in-view');
+        const accessDeniedView = document.getElementById('access-denied-view');
+        
+        const loginButton = document.getElementById('login-button');
+        const logoutButton = document.getElementById('logout-button');
+        
+        const userNameEl = document.getElementById('user-name');
+        const userEmailEl = document.getElementById('user-email');
+        const userPhotoEl = document.getElementById('user-photo');
+        const deniedEmailEl = document.getElementById('denied-email');
+
+        // --- Functions ---
+
+        // Function to handle Google Sign-In
+        const handleSignIn = async () => {
+            try {
+                // The signInWithPopup function will open a pop-up window for Google sign-in.
+                await signInWithPopup(auth, provider);
+                // After the pop-up, the onAuthStateChanged observer will handle the result.
+            } catch (error) {
+                console.error("Authentication Error:", error);
+                // You could show an error message to the user here.
+            }
+        };
+
+        // Function to handle Sign-Out
+        const handleSignOut = async () => {
+            try {
+                await signOut(auth);
+                // The onAuthStateChanged observer will detect the sign-out and update the UI.
+                console.log("User signed out successfully.");
+            } catch (error) {
+                console.error("Sign Out Error:", error);
+            }
+        };
+        
+        // Function to update the UI
+        const updateUI = (user) => {
+             // Hide all views initially
+            loggedOutView.classList.add('hidden');
+            loggedInView.classList.add('hidden');
+            accessDeniedView.classList.add('hidden');
+
+            if (user && user.email === ALLOWED_EMAIL) {
+                // User is logged in AND authorized
+                userNameEl.textContent = user.displayName;
+                userEmailEl.textContent = user.email;
+                userPhotoEl.src = user.photoURL;
+                loggedInView.classList.remove('hidden');
+            } else if (user && user.email !== ALLOWED_EMAIL) {
+                // User is logged in but NOT authorized
+                deniedEmailEl.textContent = `Attempted login by: ${user.email}`;
+                accessDeniedView.classList.remove('hidden');
+                // Automatically sign out unauthorized user after a short delay
+                setTimeout(() => {
+                    handleSignOut();
+                }, 4000); 
+            } else {
+                // User is not logged in
+                loggedOutView.classList.remove('hidden');
+            }
+        }
+
+        // --- Event Listeners ---
+        loginButton.addEventListener('click', handleSignIn);
+        logoutButton.addEventListener('click', handleSignOut);
+        
+        // --- Firebase Auth State Observer ---
+        // This is the core function that runs when the page loads and whenever
+        // the user's authentication state changes.
+        onAuthStateChanged(auth, (user) => {
+            console.log("Auth state changed. Current user:", user ? user.email : 'None');
+            updateUI(user);
+        });
+
+    </script>
+</body>
+</html>
