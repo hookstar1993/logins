@@ -20,8 +20,14 @@
 
     <div id="app" class="w-full max-w-md mx-auto p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg text-center">
         
+        <!-- Loading State -->
+        <div id="loading-view">
+            <h1 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Loading...</h1>
+            <p class="text-gray-600 dark:text-gray-400">Initializing secure session...</p>
+        </div>
+
         <!-- Logged Out State -->
-        <div id="logged-out-view">
+        <div id="logged-out-view" class="hidden">
             <h1 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Welcome</h1>
             <p class="text-gray-600 dark:text-gray-400 mb-8">Please sign in with your authorized Google account.</p>
             <button id="login-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-transform transform hover:scale-105">
@@ -47,6 +53,12 @@
             <p class="text-gray-600 dark:text-gray-400 mb-6">Sorry, you are not authorized to access this website. This session will be terminated.</p>
             <p id="denied-email" class="text-sm font-mono bg-gray-200 dark:bg-gray-700 p-2 rounded-md"></p>
         </div>
+        
+         <!-- Error State -->
+        <div id="error-view" class="hidden">
+            <h1 class="text-3xl font-bold text-yellow-500 mb-2">Error</h1>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">Could not initialize the application. Please try again later.</p>
+        </div>
 
     </div>
 
@@ -55,33 +67,23 @@
         // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-        // IMPORTANT: Replace this with your actual Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyCWciU_Ujqh1CCuIRB4vCe9-5mGjvh8RHs",
-            authDomain: "dwarka-dwarka.firebaseapp.com",
-            projectId: "dwarka-dwarka",
-            storageBucket: "dwarka-dwarka.appspot.com",
-            messagingSenderId: "251887059289",
-            appId: "1:251887059289:web:da1027cf96972ee0bf0c48",
-            measurementId: "G-Q00L119KS2"
-        };
         
         // =================================================================
-        // ==  VERY IMPORTANT: SET YOUR AUTHORIZED EMAIL ADDRESS BELOW    ==
+        // ==  1. VERY IMPORTANT: SET YOUR AUTHORIZED EMAIL ADDRESS BELOW ==
         // =================================================================
         const ALLOWED_EMAIL = "2023.hardeep@gmail.com";
         // =================================================================
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const provider = new GoogleAuthProvider();
+        // ==  2. VERY IMPORTANT: SET YOUR CLOUD FUNCTION URL BELOW       ==
+        // =================================================================
+        const CONFIG_FUNCTION_URL = "YOUR_CLOUD_FUNCTION_URL_HERE";
+        // =================================================================
 
         // DOM Elements
+        const loadingView = document.getElementById('loading-view');
         const loggedOutView = document.getElementById('logged-out-view');
         const loggedInView = document.getElementById('logged-in-view');
         const accessDeniedView = document.getElementById('access-denied-view');
+        const errorView = document.getElementById('error-view');
         
         const loginButton = document.getElementById('login-button');
         const logoutButton = document.getElementById('logout-button');
@@ -91,70 +93,86 @@
         const userPhotoEl = document.getElementById('user-photo');
         const deniedEmailEl = document.getElementById('denied-email');
 
-        // --- Functions ---
+        // Main function to initialize and run the app
+        async function main() {
+            let auth; // Will hold the auth instance
 
-        // Function to handle Google Sign-In
-        const handleSignIn = async () => {
-            try {
-                // The signInWithPopup function will open a pop-up window for Google sign-in.
-                await signInWithPopup(auth, provider);
-                // After the pop-up, the onAuthStateChanged observer will handle the result.
-            } catch (error) {
-                console.error("Authentication Error:", error);
-                // You could show an error message to the user here.
+            // Function to handle Google Sign-In
+            const handleSignIn = async () => {
+                if (!auth) return;
+                try {
+                    const provider = new GoogleAuthProvider();
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    console.error("Authentication Error:", error);
+                }
+            };
+
+            // Function to handle Sign-Out
+            const handleSignOut = async () => {
+                if (!auth) return;
+                try {
+                    await signOut(auth);
+                } catch (error)
+                 {
+                    console.error("Sign Out Error:", error);
+                }
+            };
+            
+            // Function to update the UI
+            const updateUI = (user) => {
+                loadingView.classList.add('hidden');
+                loggedOutView.classList.add('hidden');
+                loggedInView.classList.add('hidden');
+                accessDeniedView.classList.add('hidden');
+                errorView.classList.add('hidden');
+
+                if (user && user.email === ALLOWED_EMAIL) {
+                    userNameEl.textContent = user.displayName;
+                    userEmailEl.textContent = user.email;
+                    userPhotoEl.src = user.photoURL;
+                    loggedInView.classList.remove('hidden');
+                } else if (user && user.email !== ALLOWED_EMAIL) {
+                    deniedEmailEl.textContent = `Attempted login by: ${user.email}`;
+                    accessDeniedView.classList.remove('hidden');
+                    setTimeout(() => handleSignOut(), 4000); 
+                } else {
+                    loggedOutView.classList.remove('hidden');
+                }
             }
-        };
 
-        // Function to handle Sign-Out
-        const handleSignOut = async () => {
             try {
-                await signOut(auth);
-                // The onAuthStateChanged observer will detect the sign-out and update the UI.
-                console.log("User signed out successfully.");
-            } catch (error) {
-                console.error("Sign Out Error:", error);
-            }
-        };
-        
-        // Function to update the UI
-        const updateUI = (user) => {
-             // Hide all views initially
-            loggedOutView.classList.add('hidden');
-            loggedInView.classList.add('hidden');
-            accessDeniedView.classList.add('hidden');
+                // Fetch the configuration from the cloud function
+                const response = await fetch(CONFIG_FUNCTION_URL);
+                if (!response.ok) {
+                    throw new Error(`Network response was not ok, status: ${response.status}`);
+                }
+                const firebaseConfig = await response.json();
 
-            if (user && user.email === ALLOWED_EMAIL) {
-                // User is logged in AND authorized
-                userNameEl.textContent = user.displayName;
-                userEmailEl.textContent = user.email;
-                userPhotoEl.src = user.photoURL;
-                loggedInView.classList.remove('hidden');
-            } else if (user && user.email !== ALLOWED_EMAIL) {
-                // User is logged in but NOT authorized
-                deniedEmailEl.textContent = `Attempted login by: ${user.email}`;
-                accessDeniedView.classList.remove('hidden');
-                // Automatically sign out unauthorized user after a short delay
-                setTimeout(() => {
-                    handleSignOut();
-                }, 4000); 
-            } else {
-                // User is not logged in
-                loggedOutView.classList.remove('hidden');
+                // Initialize Firebase with the fetched config
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+
+                // Attach event listeners
+                loginButton.addEventListener('click', handleSignIn);
+                logoutButton.addEventListener('click', handleSignOut);
+                
+                // Set up the auth state observer
+                onAuthStateChanged(auth, (user) => {
+                    updateUI(user);
+                });
+
+            } catch(error) {
+                console.error("Failed to initialize Firebase:", error);
+                loadingView.classList.add('hidden');
+                errorView.classList.remove('hidden');
             }
         }
-
-        // --- Event Listeners ---
-        loginButton.addEventListener('click', handleSignIn);
-        logoutButton.addEventListener('click', handleSignOut);
         
-        // --- Firebase Auth State Observer ---
-        // This is the core function that runs when the page loads and whenever
-        // the user's authentication state changes.
-        onAuthStateChanged(auth, (user) => {
-            console.log("Auth state changed. Current user:", user ? user.email : 'None');
-            updateUI(user);
-        });
+        // Run the app
+        main();
 
     </script>
 </body>
 </html>
+
