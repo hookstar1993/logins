@@ -50,7 +50,7 @@
         <!-- Access Denied State -->
         <div id="access-denied-view" class="hidden">
             <h1 class="text-3xl font-bold text-red-600 dark:text-red-500 mb-2">Access Denied</h1>
-            <p class="text-gray-600 dark:text-gray-400 mb-6">Sorry, you are not authorized to access this website. This session will be terminated.</p>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">Sorry, you are not authorized to access this website. Your account has been blocked.</p>
             <p id="denied-email" class="text-sm font-mono bg-gray-200 dark:bg-gray-700 p-2 rounded-md"></p>
         </div>
         
@@ -65,13 +65,13 @@
         // =================================================================
         // ==  1. VERY IMPORTANT: SET YOUR AUTHORIZED EMAIL ADDRESS BELOW ==
         // =================================================================
-        const ALLOWED_EMAIL = "2023.hardeep@gmail.com";
+        const ALLOWED_EMAIL = "dwarkvyn@gmail.com";
         // =================================================================
         
         // =================================================================
-        // ==  2. SECURITY WARNING: Paste your Firebase config below.     ==
-        // ==  This file should NOT be in a public GitHub repository.     ==
-        // ==  MAKE YOUR REPOSITORY PRIVATE to protect these keys.        ==
+        // ==  2. Paste your Firebase config object below.                ==
+        // ==  This is safe because you have a server-side function       ==
+        // ==  protecting your user accounts.                             ==
         // =================================================================
         const firebaseConfig = {
           apiKey: "AIzaSyCWciU_Ujqh1CCuIRB4vCe9-5mGjvh8RHs",
@@ -134,9 +134,9 @@
                 userPhotoEl.src = user.photoURL;
                 loggedInView.classList.remove('hidden');
             } else if (user && user.email !== ALLOWED_EMAIL) {
+                // This view is shown briefly before the server function deletes the user
                 deniedEmailEl.textContent = `Attempted login by: ${user.email}`;
                 accessDeniedView.classList.remove('hidden');
-                setTimeout(() => handleSignOut(), 4000); 
             } else {
                 loggedOutView.classList.remove('hidden');
             }
